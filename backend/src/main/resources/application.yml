@@ -1,0 +1,33 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/rec_platform}
+    username: ${DB_USERNAME:rec_user}
+    password: ${DB_PASSWORD:change-me-db-password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-jwt-secret-at-least-32-characters-long}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
+  seed:
+    admin-email: ${APP_SEED_ADMIN_EMAIL:}
+    admin-password: ${APP_SEED_ADMIN_PASSWORD:}
+    producer-email: ${APP_SEED_PRODUCER_EMAIL:}
+    producer-password: ${APP_SEED_PRODUCER_PASSWORD:}
+    reviewer-email: ${APP_SEED_REVIEWER_EMAIL:}
+    reviewer-password: ${APP_SEED_REVIEWER_PASSWORD:}
+    manager-email: ${APP_SEED_MANAGER_EMAIL:}
+    manager-password: ${APP_SEED_MANAGER_PASSWORD:}
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.springframework.security: INFO
