@@ -16,11 +16,21 @@ pipeline {
             }
         }
 
-        stage('Backend Build & Selenium Quality Gate') {
+        stage('Build & Prepare Containers') {
+            steps {
+                echo "Building and launching container stack for testing..."
+                bat "docker compose down"
+                bat "docker compose up -d --build"
+                // Wait for Spring Boot and Nginx to fully initialize
+                powershell "Start-Sleep -Seconds 15"
+            }
+        }
+
+        stage('Selenium Quality Gate') {
             steps {
                 dir('backend') {
-                    echo "Running Maven build and Selenium E2E automated suite..."
-                    bat 'mvn clean test'
+                    echo "Executing Selenium E2E automated suite against running stack..."
+                    bat 'mvn test'
                 }
             }
             post {
@@ -31,31 +41,22 @@ pipeline {
             }
         }
 
-        stage('Build & Tag Docker Images') {
+        stage('Tag Release Images') {
             steps {
-                echo "Building versioned Docker images: Tag #${IMAGE_TAG} and latest..."
-                bat "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest -f backend/Dockerfile backend"
-                bat "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest -f frontend/Dockerfile frontend"
-            }
-        }
-
-        stage('Continuous Deployment (Docker Stack)') {
-            steps {
-                echo "Deploying updated containerized stack via docker compose..."
-                bat 'docker compose down'
-                bat 'docker compose up -d'
+                echo "Tagging stable images with build number #${IMAGE_TAG} and latest..."
+                bat "docker tag rec-platform-backend:latest ${BACKEND_IMAGE}:${IMAGE_TAG}"
+                bat "docker tag rec-platform-frontend:latest ${FRONTEND_IMAGE}:${IMAGE_TAG}"
             }
         }
 
         stage('Post-Deployment Health Probe') {
             steps {
-                echo "Probing container stack health..."
+                echo "Verifying application availability..."
                 powershell '''
-                    Start-Sleep -Seconds 12
                     $backend = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing -TimeoutSec 15
                     $frontend = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 15
                     if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200) {
-                        Write-Host "Deployment Verified! Backend and Frontend both returned HTTP 200." -ForegroundColor Green
+                        Write-Host "Deployment Health Verified: HTTP 200 on all endpoints." -ForegroundColor Green
                     } else {
                         Write-Error "Health check failed."
                         exit 1
@@ -67,10 +68,10 @@ pipeline {
 
     post {
         failure {
-            echo "Pipeline failed! Retaining previous deployment state."
+            echo "Pipeline run #${env.BUILD_NUMBER} failed."
         }
         success {
-            echo "REC Platform CD Pipeline executed successfully for build #${env.BUILD_NUMBER}!"
+            echo "REC Platform CD Pipeline completed successfully for build #${env.BUILD_NUMBER}!"
         }
     }
 }
