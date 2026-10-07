@@ -40,6 +40,8 @@ CREATED -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> ISSUED -> RETIRED
 
 Transitions are validated centrally in `RecWorkflowService`. All changes are stored in `rec_status_history`.
 
+> Main note: status history remains the audit trail of record for REC lifecycle changes.
+
 ## Main Entities
 
 - `roles`
