@@ -51,6 +51,7 @@ public class AssetService {
         return AssetResponse.from(asset);
     }
 
+    @Transactional(readOnly = true)
     public Page<AssetResponse> search(String energySource, String status, int page, int size, User currentUser) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         if (currentUser.getRole().getName() == RoleName.GENERATOR) {
@@ -68,6 +69,7 @@ public class AssetService {
         return assetRepository.findAll(pageable).map(AssetResponse::from);
     }
 
+    @Transactional(readOnly = true)
     public AssetResponse get(Long id, User currentUser) {
         Asset asset = findAsset(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !asset.getOwner().getId().equals(currentUser.getId())) {
@@ -102,6 +104,7 @@ public class AssetService {
         return AssetResponse.from(asset);
     }
 
+    @Transactional(readOnly = true)
     public List<StatusHistoryResponse> history(Long id, User currentUser) {
         Asset asset = findAsset(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !asset.getOwner().getId().equals(currentUser.getId())) {

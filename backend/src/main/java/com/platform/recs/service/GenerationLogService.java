@@ -60,6 +60,7 @@ public class GenerationLogService {
         return GenerationLogResponse.from(log);
     }
 
+    @Transactional(readOnly = true)
     public Page<GenerationLogResponse> search(String energySource, Integer vintageYear, String status, int page, int size, User currentUser) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         if (currentUser.getRole().getName() == RoleName.GENERATOR) {
@@ -81,6 +82,7 @@ public class GenerationLogService {
         return logRepository.findAll(pageable).map(GenerationLogResponse::from);
     }
 
+    @Transactional(readOnly = true)
     public GenerationLogResponse get(Long id, User currentUser) {
         GenerationLog log = findLog(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !log.getCreatedBy().getId().equals(currentUser.getId())) throw new ForbiddenOperationException("Access denied");
@@ -126,6 +128,7 @@ public class GenerationLogService {
         return GenerationLogResponse.from(log);
     }
 
+    @Transactional(readOnly = true)
     public List<StatusHistoryResponse> history(Long id, User currentUser) {
         GenerationLog log = findLog(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !log.getCreatedBy().getId().equals(currentUser.getId())) throw new ForbiddenOperationException("Access denied");

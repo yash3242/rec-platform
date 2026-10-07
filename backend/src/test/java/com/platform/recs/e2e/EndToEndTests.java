@@ -1,4 +1,4 @@
-package com.recplatform.e2e;
+package com.platform.recs.e2e;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
 import org.junit.jupiter.api.*;
@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class EndToEndTests {
     private static WebDriver driver;
     private static WebDriverWait wait;
-    private static final String BASE_URL = "http://localhost:5173";
+    private static final String BASE_URL = System.getenv().getOrDefault("FRONTEND_BASE_URL", "http://localhost:5173");
     private static String uniqueEmail(String prefix) {
         return prefix + "+" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
     }
@@ -113,12 +113,16 @@ public class EndToEndTests {
         login("generator@example.com", "Generator#12345");
         driver.get(BASE_URL + "/generation-logs");
         selectByVisibleText(By.id("logAssetId"), assetCode);
-        type(By.id("logDate"), "2026-10-01");
+        WebElement dateEl = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("logDate")));
+        ((JavascriptExecutor) driver).executeScript(
+            "const s = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;" +
+            "s.call(arguments[0], arguments[1]); arguments[0].dispatchEvent(new Event('input', {bubbles: true}));",
+            dateEl, "2026-10-01");
         selectByValue(By.id("logSource"), "SOLAR");
         type(By.id("logQuantity"), "120.5");
         type(By.id("logVintage"), "2026");
         click(By.id("submitLogButton"));
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("logTable")));
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.xpath("//table[@id='logTable']//td[text()='" + assetCode + "']")));
         assertTrue(pageText().contains(assetCode), "Generation log should appear in list");
     }
 
@@ -157,8 +161,17 @@ public class EndToEndTests {
         login("buyer@example.com", "Buyer#12345");
         driver.get(BASE_URL + "/recs");
         click(By.xpath("//table[@id='recTable']//tr[td[text()='" + recCode + "']]//button[contains(@id,'buyRec-')]"));
+        Thread.sleep(1500);
+
+        // Filter by TRANSFERRED to confirm purchase transferred ownership
+        selectByValue(By.id("recStatusFilter"), "TRANSFERRED");
+        click(By.id("searchRecsButton"));
         wait.until(ExpectedConditions.textToBePresentInElementLocated(By.xpath("//table[@id='recTable']//tr[td[text()='" + recCode + "']]//td[6]"), "TRANSFERRED"));
         click(By.xpath("//table[@id='recTable']//tr[td[text()='" + recCode + "']]//button[contains(@id,'retireRec-')]"));
+
+        // Filter by RETIRED to confirm retirement
+        selectByValue(By.id("recStatusFilter"), "RETIRED");
+        click(By.id("searchRecsButton"));
         wait.until(ExpectedConditions.textToBePresentInElementLocated(By.xpath("//table[@id='recTable']//tr[td[text()='" + recCode + "']]//td[6]"), "RETIRED"));
 
         assertTrue(pageText().contains("RETIRED"), "REC should be retired");
@@ -190,7 +203,10 @@ public class EndToEndTests {
     private void selectByValue(By by, String value) {
         WebElement el = wait.until(ExpectedConditions.visibilityOfElementLocated(by));
         el.findElements(By.tagName("option")).stream()
-            .filter(opt -> value.equals(opt.getAttribute("value")))
+            .filter(opt -> {
+                String v = opt.getAttribute("value");
+                return value.equals(v) || (v == null && value.equals(opt.getText()));
+            })
             .findFirst()
             .orElseThrow(() -> new NoSuchElementException("Option " + value + " not found"))
             .click();

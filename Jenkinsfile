@@ -47,6 +47,25 @@ pipeline {
             }
         }
 
+        stage('Test (E2E / Selenium)') {
+            steps {
+                script {
+                    echo "Starting Vite dev server for E2E tests"
+                    bat '''
+                        cd frontend
+                        start "vite-dev" /b cmd /c "npm run dev -- --port 5173 > vite-e2e.log 2>&1"
+                        ping -n 20 127.0.0.1 > nul
+                    '''
+                    dir('backend') {
+                        bat 'mvn test'
+                    }
+                    bat '''
+                        for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /pid %%a /f
+                    '''
+                }
+            }
+        }
+
         stage('Archive Artifacts') {
             steps {
                 archiveArtifacts artifacts: 'backend/target/*.jar,frontend/dist/**/*', fingerprint: true, allowEmptyArchive: false
@@ -83,8 +102,8 @@ pipeline {
 
     post {
         always {
-            junit 'backend/target/surefire-reports/*.xml'
-            archiveArtifacts artifacts: 'backend/target/screenshots/**/*', allowEmptyArchive: true
+            junit '**/target/surefire-reports/*.xml'
+            archiveArtifacts artifacts: '**/target/screenshots/*.png', allowEmptyArchive: true
             cleanWs()
         }
         success {

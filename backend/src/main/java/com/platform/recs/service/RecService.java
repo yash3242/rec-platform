@@ -34,6 +34,7 @@ public class RecService {
         this.workflowService = workflowService;
     }
 
+    @Transactional(readOnly = true)
     public Page<RecResponse> search(String energySource, Integer vintageYear, String status, int page, int size, User currentUser) {
         var pageable = PageRequest.of(page, size, Sort.by("createdAt").descending());
         if (currentUser.getRole().getName() == RoleName.GENERATOR) {
@@ -54,6 +55,7 @@ public class RecService {
         return recRepository.findAll(pageable).map(RecResponse::from);
     }
 
+    @Transactional(readOnly = true)
     public RecResponse get(Long id, User currentUser) {
         Rec rec = findRec(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !rec.getOwner().getId().equals(currentUser.getId())) throw new ForbiddenOperationException("Access denied");
@@ -92,6 +94,7 @@ public class RecService {
         return RecResponse.from(rec);
     }
 
+    @Transactional(readOnly = true)
     public List<StatusHistoryResponse> history(Long id, User currentUser) {
         Rec rec = findRec(id);
         if (currentUser.getRole().getName() == RoleName.GENERATOR && !rec.getOwner().getId().equals(currentUser.getId())) throw new ForbiddenOperationException("Access denied");
