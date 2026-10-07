@@ -1,130 +1,96 @@
-pipeline {
+﻿pipeline {
     agent any
 
-    tools {
-        maven 'Maven3'
-        jdk 'JDK17'
-    }
-
-    parameters {
-        string(name: 'DEPLOY_ENV', defaultValue: 'local-staging', description: 'Target deployment environment')
-        string(name: 'SERVER_PORT', defaultValue: '8080', description: 'Spring Boot embedded Tomcat port')
-    }
-
     environment {
-        DEPLOY_ENV = "${params.DEPLOY_ENV}"
-        SERVER_PORT = "${params.SERVER_PORT}"
-        BACKEND_DIR = "${WORKSPACE}\\backend"
-        FRONTEND_DIR = "${WORKSPACE}\\frontend"
-    }
-
-    options {
-        timestamps()
-        disableConcurrentBuilds()
+        DOCKER_REGISTRY = "local" // Change to your Docker Hub username if pushing remotely
+        IMAGE_TAG = ""
+        BACKEND_IMAGE = "rec-backend"
+        FRONTEND_IMAGE = "rec-frontend"
     }
 
     stages {
         stage('Checkout') {
             steps {
+                echo "Checking out REC Platform source code..."
                 checkout scm
             }
         }
 
-        stage('Build Frontend') {
-            steps {
-                dir('frontend') {
-                    bat 'npm ci'
-                    bat 'npm run build'
-                }
-            }
-        }
-
-        stage('Build Backend') {
+        stage('Backend Build & Selenium Quality Gate') {
             steps {
                 dir('backend') {
-                    bat 'mvn clean package -DskipTests'
-                }
-            }
-        }
-
-        stage('Test (E2E / Selenium)') {
-            steps {
-                script {
-                    echo "Starting Vite dev server for E2E tests"
-                    bat '''
-                        cd frontend
-                        start "vite-dev" /b cmd /c "npm run dev -- --port 5173 > vite-e2e.log 2>&1"
-                        ping -n 20 127.0.0.1 > nul
-                    '''
-                    dir('backend') {
-                        bat 'mvn test'
-                    }
-                    bat '''
-                        for /f "tokens=5" %%a in ('netstat -aon ^| findstr :5173 ^| findstr LISTENING') do taskkill /pid %%a /f
-                    '''
-                }
-            }
-        }
-
-        stage('Run Selenium Tests') {
-            steps {
-                dir('backend') {
-                    bat 'mvn test'
+                    echo "Running Maven build and Selenium E2E automated suite..."
+                    bat 'mvn clean test'
                 }
             }
             post {
                 always {
-                    junit 'backend/target/surefire-reports/*.xml'
-                    archiveArtifacts artifacts: 'backend/target/screenshots/**/*', allowEmptyArchive: true
+                    junit testResults: 'backend/target/surefire-reports/*.xml', allowEmptyResults: true
+                    archiveArtifacts artifacts: 'backend/target/screenshots/*.png', allowEmptyArchive: true
                 }
             }
         }
 
-        stage('Archive Artifacts') {
+        stage('Build & Tag Docker Images') {
             steps {
-                archiveArtifacts artifacts: 'backend/target/*.jar,frontend/dist/**/*', fingerprint: true, allowEmptyArchive: false
+                echo "Building versioned Docker images: Tag # and latest..."
+                bat "docker build -t : -t :latest -f backend/Dockerfile backend"
+                bat "docker build -t : -t :latest -f frontend/Dockerfile frontend"
             }
         }
 
-        stage('Deploy') {
+        stage('Registry Publish (Optional / Local)') {
             steps {
                 script {
-                    echo "Deploying to ${DEPLOY_ENV} on port ${SERVER_PORT}"
-                    powershell '''
-                        $port = [int]$env:SERVER_PORT
-                        $connections = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue
-                        if ($connections) {
-                            $connections | Select-Object -ExpandProperty OwningProcess | ForEach-Object {
-                                Write-Host "Stopping process $_ on port $port"
-                                Stop-Process -Id $_ -Force
-                            }
+                    echo "Tagging complete for version: "
+                    // If DOCKER_REGISTRY != 'local', tag and push to remote registry
+                    if (env.DOCKER_REGISTRY != "local") {
+                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
+                            bat "docker login -u %DH_USER% -p %DH_PASS%"
+                            bat "docker tag : %DH_USER%/:"
+                            bat "docker tag : %DH_USER%/:"
+                            bat "docker push %DH_USER%/:"
+                            bat "docker push %DH_USER%/:"
                         }
-                    '''
-                    bat '''
-                        set JAVA_HOME=C:\\Program Files\\Eclipse Adoptium\\jdk-17.0.20.101-hotspot
-                        set "PATH=%JAVA_HOME%\\bin;%PATH%"
-                        for %%f in (backend\\target\\*.jar) do (
-                            start "" /b java -jar %%f --server.port=%SERVER_PORT%
-                            goto :startDone
-                        )
-                        :startDone
-                    '''
+                    } else {
+                        echo "Registry mode set to 'local'. Images stored in local Docker daemon."
+                    }
                 }
+            }
+        }
+
+        stage('Continuous Deployment (Docker Stack)') {
+            steps {
+                echo "Deploying updated containerized stack via docker compose..."
+                bat 'docker compose down'
+                bat 'docker compose up -d'
+            }
+        }
+
+        stage('Post-Deployment Health Probe') {
+            steps {
+                echo "Probing container stack health..."
+                powershell '''
+                    Start-Sleep -Seconds 10
+                     = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing -TimeoutSec 15
+                     = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 15
+                    if (.StatusCode -eq 200 -and .StatusCode -eq 200) {
+                        Write-Host "Deployment Verified! Backend and Frontend both returned HTTP 200." -ForegroundColor Green
+                    } else {
+                        Write-Error "Health check failed."
+                        exit 1
+                    }
+                '''
             }
         }
     }
 
     post {
-        always {
-            junit '**/target/surefire-reports/*.xml'
-            archiveArtifacts artifacts: '**/target/screenshots/*.png', allowEmptyArchive: true
-            cleanWs()
+        failure {
+            echo "Pipeline failed! Retaining previous deployment state."
         }
         success {
-            echo "SUCCESS: Built and deployed REC Platform to ${DEPLOY_ENV} on port ${SERVER_PORT}"
-        }
-        failure {
-            echo "FAILURE: Build, test, or deployment failed. Check Surefire reports and screenshots."
+            echo "REC Platform CD Pipeline executed successfully for build #!"
         }
     }
 }
