@@ -2,7 +2,7 @@
     agent any
 
     environment {
-        DOCKER_REGISTRY = "local" // Change to your Docker Hub username if pushing remotely
+        DOCKER_REGISTRY = "local"
         IMAGE_TAG = ""
         BACKEND_IMAGE = "rec-backend"
         FRONTEND_IMAGE = "rec-frontend"
@@ -39,26 +39,6 @@
             }
         }
 
-        stage('Registry Publish (Optional / Local)') {
-            steps {
-                script {
-                    echo "Tagging complete for version: "
-                    // If DOCKER_REGISTRY != 'local', tag and push to remote registry
-                    if (env.DOCKER_REGISTRY != "local") {
-                        withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DH_USER', passwordVariable: 'DH_PASS')]) {
-                            bat "docker login -u %DH_USER% -p %DH_PASS%"
-                            bat "docker tag : %DH_USER%/:"
-                            bat "docker tag : %DH_USER%/:"
-                            bat "docker push %DH_USER%/:"
-                            bat "docker push %DH_USER%/:"
-                        }
-                    } else {
-                        echo "Registry mode set to 'local'. Images stored in local Docker daemon."
-                    }
-                }
-            }
-        }
-
         stage('Continuous Deployment (Docker Stack)') {
             steps {
                 echo "Deploying updated containerized stack via docker compose..."
@@ -71,7 +51,7 @@
             steps {
                 echo "Probing container stack health..."
                 powershell '''
-                    Start-Sleep -Seconds 10
+                    Start-Sleep -Seconds 12
                      = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing -TimeoutSec 15
                      = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 15
                     if (.StatusCode -eq 200 -and .StatusCode -eq 200) {
