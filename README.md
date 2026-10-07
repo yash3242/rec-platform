@@ -1,152 +1,268 @@
 # Automated Renewable Energy Certificate Platform
 
-A full-stack MVP for creating, tracking, reviewing, approving, issuing, and retiring Renewable Energy Certificates with role-based workflow and persistent storage.
+A full-stack MVP for asset onboarding, generation logging, and Renewable Energy Certificate issuance, trading, and retirement through strict teen workflows.
 
 ## Tech Stack
 
 - Backend: Java 17, Spring Boot 3, Spring Security JWT, Spring Data JPA, Flyway, PostgreSQL
 - Frontend: React, TypeScript, Vite, React Router, Axios
-- Local DB: Docker Compose / PostgreSQL
-- Build: Maven, npm
+- Browser automation: Selenium WebDriver, WebDriverManager, JUnit 5
+- CI: Jenkins declarative pipeline, Maven build, npm build, Surefire XML, screenshot artifacts
+- Local database: Docker Compose / PostgreSQL
 
 ## Architecture
 
 ```text
-React frontend
+React/Vite frontend (port 5173)
   -> REST API
     -> Spring Boot controllers
       -> services / workflow rules
-        -> repositories
-          -> PostgreSQL
+        -> JPA repositories
+          -> PostgreSQL (port 5432)
 ```
 
-The backend is layered: controllers handle HTTP, services contain business/workflow logic, repositories access the database, and DTOs separate API contracts from JPA entities.
+Backend package layout:
 
-## Roles and Permissions
+```text
+backend/src/main/java/com/platform/recs/
+  config/     security, CORS, frontend/test setup
+  controller/ REST endpoints
+  dto/        request/response contracts
+  entity/     JPA entities
+  enumtype/   domain enums
+  exception/  exception handling and response shape
+  repository/ Spring Data JPA repositories
+  security/   JWT utilities and filters
+  service/    business rules, state machines, dashboard KPIs
+```
+
+Selenium E2E tests run from:
+
+```text
+backend/src/test/java/com/platform/recs/e2e/
+```
+
+## Roles
 
 | Role | Permissions |
 |---|---|
-| `ADMIN` | Full oversight, user status management, all RECs, all transitions |
-| `PRODUCER` | Create/edit own CREATED or REJECTED RECs, submit, view own records |
-| `REVIEWER` | Start review, approve/reject under-review RECs |
-| `MANAGER` | Issue approved RECs, retire issued RECs |
+| `ADMIN` | Verify/suspend assets, verify/reject/mint generation logs, all REC transitions, user oversight |
+| `GENERATOR` | Onboard assets, view own assets/logs/minted RECs, list RECs |
+| `BUYER` | Browse listed REC marketplace, purchase listed RECs, retire transferred RECs |
 
-## REC Lifecycle
+## State Machines
+
+### Asset
 
 ```text
-CREATED -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> ISSUED -> RETIRED
-                           \-> REJECTED -> CREATED
+PENDING_VERIFICATION -> ACTIVE -> SUSPENDED
 ```
 
-Transitions are validated centrally in `RecWorkflowService`. All changes are stored in `rec_status_history`.
+### Generation Log
 
-> Main note: status history remains the audit trail of record for REC lifecycle changes.
-> Branch note: status workflow rules were refined in `feature/status-workflow` (v1.0.0 track).
+```text
+SUBMITTED -> VERIFIED -> MINTED
+     \----> REJECTED
+```
+
+### REC
+
+```text
+ISSUED -> LISTED -> TRANSFERRED -> RETIRED
+```
+
+Transitions are validated centrally in `AssetWorkflowService`, `GenerationLogWorkflowService`, and `RecWorkflowService`. Status changes are recorded in `status_history` with actor, old/new status, and comment.
 
 ## Main Entities
 
 - `roles`
 - `users`
+- `assets`
+- `generation_logs`
 - `recs`
-- `rec_status_history`
+- `status_history`
 
 ## Database
 
-Flyway migrations create the schema and seed roles. For persistence, use PostgreSQL.
+Flyway migrations run on backend startup and create all required tables. If using Docker:
 
 ```bash
-cd rec-platform
+cd C:\Users\Yash\Desktop\rec-platform
 docker compose up -d postgres
 ```
 
-If Docker is unavailable, create a PostgreSQL database named `rec_platform` and a user `rec_user`.
+If using a local PostgreSQL, the intended database is:
 
-## Environment Variables
+```text
+Host: localhost
+Port: 5432
+Database: rec_platform
+User: postgres
+```
 
-Copy `.env.example` to `.env` and replace placeholders.
+Configure local secrets in `.env` using `.env.example` as a template. Do not commit `.env` or real production secrets.
 
-Important variables:
+## Environment Configuration
 
-- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
-- `JWT_SECRET`, `JWT_EXPIRATION_MS`
-- `APP_SEED_*_EMAIL`, `APP_SEED_*_PASSWORD`
+`rec-platform/scripts/start-backend.ps1` automatically loads `rec-platform/.env`.
+Important values:
 
-Do not commit `.env` or real secrets.
+```env
+DB_URL=jdbc:postgresql://localhost:5432/rec_platform
+DB_USERNAME=postgres
+DB_PASSWORD=...
+JWT_SECRET=...
+APP_SEED_ADMIN_EMAIL=admin@example.com
+APP_SEED_ADMIN_PASSWORD=...
+APP_SEED_GENERATOR_EMAIL=generator@example.com
+APP_SEED_GENERATOR_PASSWORD=...
+APP_SEED_BUYER_EMAIL=buyer@example.com
+APP_SEED_BUYER_PASSWORD=...
+```
 
-## Run Backend
+## Running
 
-```bash
-cd rec-platform/backend
-# Use Maven from your installation or downloaded tools path
+Backend:
+
+```powershell
+cd C:\Users\Yash\Desktop\rec-platform\backend
 mvn spring-boot:run
 ```
 
-Default API port: `8080`
+Frontend:
 
-## Run Frontend
-
-```bash
-cd rec-platform/frontend
-npm install
-npm run dev
+```powershell
+cd C:\Users\Yash\Desktop\rec-platform\frontend
+npm.cmd run dev
 ```
 
-Default frontend URL: `http://localhost:5173`
+Backend API:
+
+```text
+http://localhost:8080/api/v1
+```
+
+Frontend:
+
+```text
+http://localhost:5173
+```
 
 ## API Overview
 
-Base URL: `/api/v1`
-
 ### Auth
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /auth/me`
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
 
-### Users
+### Assets
 
-- `GET /users` — ADMIN only
-- `PATCH /users/{id}/status` — ADMIN only
+- `POST /api/v1/assets`
+- `GET /api/v1/assets?energySource=&status=&page=&size=`
+- `GET /api/v1/assets/{id}`
+- `PUT /api/v1/assets/{id}`
+- `PATCH /api/v1/assets/{id}/status`
+- `GET /api/v1/assets/{id}/history`
+
+### Generation Logs
+
+- `POST /api/v1/generation-logs`
+- `GET /api/v1/generation-logs?energySource=&vintageYear=&status=&page=&size=`
+- `GET /api/v1/generation-logs/{id}`
+- `PUT /api/v1/generation-logs/{id}`
+- `PATCH /api/v1/generation-logs/{id}/status`
+- `GET /api/v1/generation-logs/{id}/history`
 
 ### RECs
 
-- `POST /recs`
-- `GET /recs` with filters:
-  `recCode`, `producerId`, `energySource`, `status`, `startFrom`, `endTo`, `minCertQty`, `maxCertQty`, `page`, `size`, `sort`
-- `GET /recs/{id}`
-- `PUT /recs/{id}`
-- `PATCH /recs/{id}/status`
-- `GET /recs/{id}/history`
+- `GET /api/v1/recs?energySource=&vintageYear=&status=&page=&size=`
+- `GET /api/v1/recs/{id}`
+- `PATCH /api/v1/recs/{id}/status`
+- `POST /api/v1/recs/{id}/purchase`
+- `GET /api/v1/recs/{id}/history`
 
 ### Dashboard
 
-- `GET /dashboard/summary`
+- `GET /api/v1/dashboard/summary`
 
-## Demo Seed Users
+## Test Automation
 
-If seed environment variables are provided, these users are created on startup:
+Backend unit tests:
 
-- Admin
-- Producer
-- Reviewer
-- Manager
+```powershell
+cd C:\Users\Yash\Desktop\rec-platform\backend
+mvn test
+```
 
-Use the passwords configured in your local `.env`.
+The Selenium suite expects both backend and frontend to be running before `mvn test`. It includes four journeys:
 
-## Security Notes
+1. Authentication, registration, and role-based redirect validation.
+2. Generator onboarding a solar/wind asset and submitting generation logs.
+3. Admin review, verification, and REC minting.
+4. Buyer browsing the marketplace, purchasing an active REC, and executing certificate retirement.
 
-- Passwords are hashed with BCrypt.
-- JWTs are signed with `JWT_SECRET`.
-- API endpoints are protected except login/register.
-- Producers can only access their own records.
-- Status changes are restricted by role and validated by workflow.
-- Secrets are read from environment variables, not hard-coded.
+Failure screenshots are saved under:
 
-## Future Improvements
+```text
+backend/target/screenshots/
+```
 
-- Admin UI for user/role management
-- More detailed REC validation
-- Server-side pagination in all views
-- Audit export
-- Refresh tokens and logout revocation
-- File upload for generation evidence
+## Jenkins CI/CD
+
+The declarative pipeline is in:
+
+```text
+rec-platform/Jenkinsfile
+```
+
+It installs/tool-binds:
+
+```groovy
+tools { maven 'Maven3'; jdk 'JDK17' }
+```
+
+and defines parameters:
+
+```groovy
+DEPLOY_ENV   defaultValue: 'local-staging'
+SERVER_PORT  defaultValue: '8080'
+```
+
+Stages:
+
+1. Checkout
+2. Build Frontend
+3. Build Backend
+4. Run Selenium Tests
+5. Archive Artifacts
+6. Deploy embedded Tomcat Spring Boot JAR
+
+If tests fail, the pipeline fails before deployment.
+
+## Git Workflow Demonstration
+
+Script:
+
+```text
+rec-platform/scripts/git-workflow-demo.ps1
+```
+
+It demonstrates:
+
+- creating `feature/status-workflow`
+- introducing a merge conflict in a shared file
+- resolving the conflict
+- merging into `main`
+- tagging `v1.0.0-mvp`
+- printing `git log --graph --oneline --all`
+
+## CI Quality Gate Demonstration
+
+Document:
+
+```text
+rec-platform/docs/ci-quality-gate.md
+```
+
+It explains how to modify an assertion, observe failed build, then restore and verify green build.

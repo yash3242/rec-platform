@@ -66,6 +66,20 @@ pipeline {
             }
         }
 
+        stage('Run Selenium Tests') {
+            steps {
+                dir('backend') {
+                    bat 'mvn test'
+                }
+            }
+            post {
+                always {
+                    junit 'backend/target/surefire-reports/*.xml'
+                    archiveArtifacts artifacts: 'backend/target/screenshots/**/*', allowEmptyArchive: true
+                }
+            }
+        }
+
         stage('Archive Artifacts') {
             steps {
                 archiveArtifacts artifacts: 'backend/target/*.jar,frontend/dist/**/*', fingerprint: true, allowEmptyArchive: false
