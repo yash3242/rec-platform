@@ -1,9 +1,9 @@
-﻿pipeline {
+pipeline {
     agent any
 
     environment {
         DOCKER_REGISTRY = "local"
-        IMAGE_TAG = ""
+        IMAGE_TAG = "${env.BUILD_NUMBER}"
         BACKEND_IMAGE = "rec-backend"
         FRONTEND_IMAGE = "rec-frontend"
     }
@@ -33,9 +33,9 @@
 
         stage('Build & Tag Docker Images') {
             steps {
-                echo "Building versioned Docker images: Tag # and latest..."
-                bat "docker build -t : -t :latest -f backend/Dockerfile backend"
-                bat "docker build -t : -t :latest -f frontend/Dockerfile frontend"
+                echo "Building versioned Docker images: Tag #${IMAGE_TAG} and latest..."
+                bat "docker build -t ${BACKEND_IMAGE}:${IMAGE_TAG} -t ${BACKEND_IMAGE}:latest -f backend/Dockerfile backend"
+                bat "docker build -t ${FRONTEND_IMAGE}:${IMAGE_TAG} -t ${FRONTEND_IMAGE}:latest -f frontend/Dockerfile frontend"
             }
         }
 
@@ -52,9 +52,9 @@
                 echo "Probing container stack health..."
                 powershell '''
                     Start-Sleep -Seconds 12
-                     = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing -TimeoutSec 15
-                     = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 15
-                    if (.StatusCode -eq 200 -and .StatusCode -eq 200) {
+                    $backend = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing -TimeoutSec 15
+                    $frontend = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing -TimeoutSec 15
+                    if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200) {
                         Write-Host "Deployment Verified! Backend and Frontend both returned HTTP 200." -ForegroundColor Green
                     } else {
                         Write-Error "Health check failed."
@@ -70,7 +70,7 @@
             echo "Pipeline failed! Retaining previous deployment state."
         }
         success {
-            echo "REC Platform CD Pipeline executed successfully for build #!"
+            echo "REC Platform CD Pipeline executed successfully for build #${env.BUILD_NUMBER}!"
         }
     }
 }
