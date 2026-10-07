@@ -40,6 +40,8 @@ CREATED -> SUBMITTED -> UNDER_REVIEW -> APPROVED -> ISSUED -> RETIRED
 
 Transitions are validated centrally in `RecWorkflowService`. All changes are stored in `rec_status_history`.
 
+> Branch note: status workflow rules were refined in `feature/status-workflow` (v1.0.0 track).
+
 ## Main Entities
 
 - `roles`
