@@ -10,8 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
-
 @Component
 public class DataInitializer implements CommandLineRunner {
     private final RoleRepository roleRepository;
@@ -26,24 +24,19 @@ public class DataInitializer implements CommandLineRunner {
 
     @Value("${app.seed.admin-email:}") private String adminEmail;
     @Value("${app.seed.admin-password:}") private String adminPassword;
-    @Value("${app.seed.producer-email:}") private String producerEmail;
-    @Value("${app.seed.producer-password:}") private String producerPassword;
-    @Value("${app.seed.reviewer-email:}") private String reviewerEmail;
-    @Value("${app.seed.reviewer-password:}") private String reviewerPassword;
-    @Value("${app.seed.manager-email:}") private String managerEmail;
-    @Value("${app.seed.manager-password:}") private String managerPassword;
+    @Value("${app.seed.generator-email:}") private String generatorEmail;
+    @Value("${app.seed.generator-password:}") private String generatorPassword;
+    @Value("${app.seed.buyer-email:}") private String buyerEmail;
+    @Value("${app.seed.buyer-password:}") private String buyerPassword;
 
     @Override
     public void run(String... args) {
         seedRole(RoleName.ADMIN);
-        seedRole(RoleName.PRODUCER);
-        seedRole(RoleName.REVIEWER);
-        seedRole(RoleName.MANAGER);
-
+        seedRole(RoleName.GENERATOR);
+        seedRole(RoleName.BUYER);
         seedUser(adminEmail, adminPassword, RoleName.ADMIN, "Seed Admin");
-        seedUser(producerEmail, producerPassword, RoleName.PRODUCER, "Seed Producer");
-        seedUser(reviewerEmail, reviewerPassword, RoleName.REVIEWER, "Seed Reviewer");
-        seedUser(managerEmail, managerPassword, RoleName.MANAGER, "Seed Manager");
+        seedUser(generatorEmail, generatorPassword, RoleName.GENERATOR, "Seed Generator");
+        seedUser(buyerEmail, buyerPassword, RoleName.BUYER, "Seed Buyer");
     }
 
     private void seedRole(RoleName name) {

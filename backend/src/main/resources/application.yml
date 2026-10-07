@@ -18,12 +18,10 @@ app:
   seed:
     admin-email: ${APP_SEED_ADMIN_EMAIL:}
     admin-password: ${APP_SEED_ADMIN_PASSWORD:}
-    producer-email: ${APP_SEED_PRODUCER_EMAIL:}
-    producer-password: ${APP_SEED_PRODUCER_PASSWORD:}
-    reviewer-email: ${APP_SEED_REVIEWER_EMAIL:}
-    reviewer-password: ${APP_SEED_REVIEWER_PASSWORD:}
-    manager-email: ${APP_SEED_MANAGER_EMAIL:}
-    manager-password: ${APP_SEED_MANAGER_PASSWORD:}
+    generator-email: ${APP_SEED_GENERATOR_EMAIL:}
+    generator-password: ${APP_SEED_GENERATOR_PASSWORD:}
+    buyer-email: ${APP_SEED_BUYER_EMAIL:}
+    buyer-password: ${APP_SEED_BUYER_PASSWORD:}
 
 server:
   port: 8080

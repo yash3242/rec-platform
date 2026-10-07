@@ -33,25 +33,25 @@ public class AuthService {
         if (userRepository.existsByEmail(request.email())) {
             throw new BadRequestException("Email is already registered");
         }
-        Role producerRole = roleRepository.findByName(RoleName.PRODUCER)
-            .orElseThrow(() -> new IllegalStateException("Producer role not seeded"));
+        RoleName requestedRole = request.role() == null || request.role().isBlank() ? RoleName.GENERATOR : RoleName.valueOf(request.role().toUpperCase());
+        if (requestedRole != RoleName.GENERATOR && requestedRole != RoleName.BUYER) {
+            throw new BadRequestException("Public registration is limited to GENERATOR or BUYER");
+        }
+        Role role = roleRepository.findByName(requestedRole).orElseThrow(() -> new IllegalStateException("Role missing"));
         User user = new User();
         user.setFullName(request.fullName());
         user.setEmail(request.email());
         user.setPasswordHash(passwordEncoder.encode(request.password()));
-        user.setRole(producerRole);
+        user.setRole(role);
         userRepository.save(user);
         String token = jwtService.generateToken(user.getEmail(), user.getRole().getName().name());
         return new AuthResponse(token, user.getId(), user.getFullName(), user.getEmail(), user.getRole().getName().name());
     }
 
-    @Transactional(readOnly = true)
     public AuthResponse login(LoginRequest request) {
         User user = userRepository.findByEmail(request.email())
             .orElseThrow(() -> new BadRequestException("Invalid email or password"));
-        if (!user.isActive()) {
-            throw new BadRequestException("Account is deactivated");
-        }
+        if (!user.isActive()) throw new BadRequestException("Account is deactivated");
         if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
             throw new BadRequestException("Invalid email or password");
         }

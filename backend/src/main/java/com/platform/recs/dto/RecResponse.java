@@ -1,38 +1,43 @@
 package com.platform.recs.dto;
 
-import com.platform.recs.entity.RenewableEnergyCertificate;
+import com.platform.recs.entity.Rec;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public record RecResponse(
     Long id,
     String recCode,
-    Long producerId,
-    String producerName,
+    Long assetId,
+    String assetCode,
     String energySource,
-    LocalDate generationStartDate,
-    LocalDate generationEndDate,
+    Integer vintageYear,
     BigDecimal energyQuantityMwh,
     Integer certificateQuantity,
     String status,
-    LocalDateTime createdAt,
-    LocalDateTime updatedAt
+    Long ownerId,
+    String ownerName,
+    LocalDateTime listedAt,
+    LocalDateTime transferredAt,
+    LocalDateTime retiredAt,
+    LocalDateTime createdAt
 ) {
-    public static RecResponse from(RenewableEnergyCertificate rec) {
+    public static RecResponse from(Rec rec) {
         return new RecResponse(
             rec.getId(),
             rec.getRecCode(),
-            rec.getProducer().getId(),
-            rec.getProducer().getFullName(),
+            rec.getAsset().getId(),
+            rec.getAsset().getAssetCode(),
             rec.getEnergySource().name(),
-            rec.getGenerationStartDate(),
-            rec.getGenerationEndDate(),
+            rec.getVintageYear(),
             rec.getEnergyQuantityMwh(),
             rec.getCertificateQuantity(),
             rec.getStatus().name(),
-            rec.getCreatedAt(),
-            rec.getUpdatedAt()
+            rec.getOwner().getId(),
+            rec.getOwner().getFullName(),
+            rec.getListedAt(),
+            rec.getTransferredAt(),
+            rec.getRetiredAt(),
+            rec.getCreatedAt()
         );
     }
 }

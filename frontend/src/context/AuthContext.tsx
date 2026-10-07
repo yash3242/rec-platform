@@ -6,11 +6,17 @@ import { login as loginApi, register as registerApi } from '../api/auth';
 interface AuthState {
   user: AuthResponse | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (fullName: string, email: string, password: string) => Promise<void>;
+  register: (fullName: string, email: string, password: string, role: Role) => Promise<void>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
+
+function redirectForRole(role: Role, navigate: (path: string) => void) {
+  if (role === 'GENERATOR') navigate('/assets');
+  else if (role === 'BUYER') navigate('/recs');
+  else navigate('/dashboard');
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthResponse | null>(() => {
@@ -29,13 +35,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   async function login(email: string, password: string) {
     const response = await loginApi(email, password);
     setUser(response);
-    navigate('/dashboard');
+    redirectForRole(response.role, navigate);
   }
 
-  async function register(fullName: string, email: string, password: string) {
-    const response = await registerApi(fullName, email, password);
+  async function register(fullName: string, email: string, password: string, role: Role) {
+    const response = await registerApi(fullName, email, password, role);
     setUser(response);
-    navigate('/dashboard');
+    redirectForRole(response.role, navigate);
   }
 
   function logout() {

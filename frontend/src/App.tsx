@@ -5,9 +5,9 @@ import Layout from './components/Layout';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
-import RecListPage from './pages/RecListPage';
-import RecDetailPage from './pages/RecDetailPage';
-import RecFormPage from './pages/RecFormPage';
+import AssetsPage from './pages/AssetsPage';
+import GenerationLogsPage from './pages/GenerationLogsPage';
+import RecsPage from './pages/RecsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -31,10 +31,9 @@ export default function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
-          <Route path="recs" element={<RecListPage />} />
-          <Route path="recs/new" element={<RecFormPage />} />
-          <Route path="recs/:id" element={<RecDetailPage />} />
-          <Route path="recs/:id/edit" element={<RecFormPage />} />
+          <Route path="assets" element={<AssetsPage />} />
+          <Route path="generation-logs" element={<GenerationLogsPage />} />
+          <Route path="recs" element={<RecsPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>

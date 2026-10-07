@@ -23,11 +23,11 @@ export default function LoginPage() {
       <h2>Login</h2>
       <form onSubmit={handleSubmit}>
         <label>Email</label>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} required />
+        <input id="loginEmail" value={email} onChange={(e) => setEmail(e.target.value)} required />
         <label>Password</label>
-        <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        <input id="loginPassword" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
         {error && <p style={{ color: 'red' }}>{error}</p>}
-        <button className="btn" type="submit">Login</button>
+        <button id="loginButton" className="btn" type="submit">Login</button>
       </form>
       <p>No account? <Link to="/register">Register</Link></p>
     </div>

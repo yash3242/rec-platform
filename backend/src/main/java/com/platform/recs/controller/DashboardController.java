@@ -1,6 +1,7 @@
 package com.platform.recs.controller;
 
 import com.platform.recs.dto.DashboardSummary;
+import com.platform.recs.security.SecurityUtils;
 import com.platform.recs.service.DashboardService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,6 +18,6 @@ public class DashboardController {
 
     @GetMapping("/summary")
     public DashboardSummary summary() {
-        return dashboardService.summary();
+        return dashboardService.summary(SecurityUtils.currentUser());
     }
 }

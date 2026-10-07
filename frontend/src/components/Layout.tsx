@@ -9,14 +9,15 @@ export default function Layout() {
       <aside className="sidebar">
         <h1>REC Platform</h1>
         <nav>
-          <Link to="/dashboard">Dashboard</Link>
-          <Link to="/recs">RECs</Link>
-          {(user?.role === 'PRODUCER' || user?.role === 'ADMIN') && <Link to="/recs/new">New REC</Link>}
+          {user?.role === 'ADMIN' && <Link to="/dashboard">Dashboard</Link>}
+          {(user?.role === 'GENERATOR' || user?.role === 'ADMIN') && <Link to="/assets">Assets</Link>}
+          {(user?.role === 'GENERATOR' || user?.role === 'ADMIN') && <Link to="/generation-logs">Generation Logs</Link>}
+          {(user?.role === 'BUYER' || user?.role === 'ADMIN' || user?.role === 'GENERATOR') && <Link to="/recs">RECs</Link>}
         </nav>
         <div className="user-box">
           <strong>{user?.fullName}</strong>
           <span>{user?.role}</span>
-          <button onClick={logout}>Logout</button>
+          <button id="logoutButton" onClick={logout}>Logout</button>
         </div>
       </aside>
       <main className="content">

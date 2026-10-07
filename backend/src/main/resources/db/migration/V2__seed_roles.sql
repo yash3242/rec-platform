@@ -1,6 +1,5 @@
 INSERT INTO roles (name) VALUES
 ('ADMIN'),
-('PRODUCER'),
-('REVIEWER'),
-('MANAGER')
+('GENERATOR'),
+('BUYER')
 ON CONFLICT (name) DO NOTHING;
