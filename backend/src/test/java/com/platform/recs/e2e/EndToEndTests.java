@@ -112,6 +112,7 @@ public class EndToEndTests {
         wait.until(ExpectedConditions.urlContains("/login"));
         login("generator@example.com", "Generator#12345");
         driver.get(BASE_URL + "/generation-logs");
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//select[@id='logAssetId']/option[text()='" + assetCode + "']")));
         selectByVisibleText(By.id("logAssetId"), assetCode);
         WebElement dateEl = wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("logDate")));
         ((JavascriptExecutor) driver).executeScript(
@@ -132,6 +133,7 @@ public class EndToEndTests {
         login("admin@example.com", "Admin#12345");
         driver.get(BASE_URL + "/generation-logs");
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("logTable")));
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//table[@id='logTable']//button[contains(@id,'verifyLog-')]")));
 
         // Verify first submitted log if present, then mint it
         click(By.xpath("//table[@id='logTable']//button[contains(@id,'verifyLog-')]"));
@@ -179,6 +181,7 @@ public class EndToEndTests {
 
     private String firstRecCodeFromRecsPage() {
         wait.until(ExpectedConditions.visibilityOfElementLocated(By.id("recTable")));
+        wait.until(ExpectedConditions.presenceOfElementLocated(By.xpath("//table[@id='recTable']//tr[1]/td[1]")));
         return driver.findElement(By.xpath("//table[@id='recTable']//tr[1]/td[1]")).getText();
     }
 
