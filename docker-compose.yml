@@ -1,15 +1,52 @@
-version: '3.8'
 services:
-  postgres:
-    image: postgres:16
-    container_name: rec_platform_postgres
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: rec-postgres-db
     environment:
       POSTGRES_DB: rec_platform
       POSTGRES_USER: rec_user
-      POSTGRES_PASSWORD: change-me-db-password
+      POSTGRES_PASSWORD: rec_user_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rec_user -d rec_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build: ./backend
+    image: rec-backend:v1.0.0
+    container_name: rec-backend
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres-db:5432/rec_platform
+      DB_USERNAME: rec_user
+      DB_PASSWORD: rec_user_password
+      JWT_SECRET: docker-dev-jwt-secret-change-me-please-32-chars
+      JWT_EXPIRATION_MS: "86400000"
+      APP_SEED_ADMIN_EMAIL: admin@example.com
+      APP_SEED_ADMIN_PASSWORD: Admin#12345
+      APP_SEED_GENERATOR_EMAIL: generator@example.com
+      APP_SEED_GENERATOR_PASSWORD: Generator#12345
+      APP_SEED_BUYER_EMAIL: buyer@example.com
+      APP_SEED_BUYER_PASSWORD: Buyer#12345
+    ports:
+      - "8080:8080"
+
+  frontend:
+    build: ./frontend
+    image: rec-frontend:v1.0.0
+    container_name: rec-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
 volumes:
   postgres_data:

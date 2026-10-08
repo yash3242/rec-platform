@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
 public class EndToEndTests {
     private static WebDriver driver;
     private static WebDriverWait wait;
-    private static final String BASE_URL = System.getenv().getOrDefault("FRONTEND_BASE_URL", "http://localhost:5173");
+    private static final String BASE_URL = System.getenv().getOrDefault("FRONTEND_BASE_URL", "http://127.0.0.1:5173");
     private static String uniqueEmail(String prefix) {
         return prefix + "+" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
     }
@@ -28,7 +28,7 @@ public class EndToEndTests {
     static void setupClass() {
         WebDriverManager.chromedriver().setup();
         ChromeOptions options = new ChromeOptions();
-        options.addArguments("--headless=new", "--window-size=1400,900");
+        options.addArguments("--headless=new", "--window-size=1400,900", "--no-proxy-server", "--disable-offline-mode=false", "--proxy-server=direct://");
         driver = new ChromeDriver(options);
         ScreenshotOnFailureListener.setDriver(driver);
         wait = new WebDriverWait(driver, Duration.ofSeconds(15));
