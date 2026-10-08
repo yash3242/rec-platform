@@ -8,10 +8,10 @@ pipeline {
             }
         }
 
-        stage('Selenium Quality Gate') {
+        stage('Quality Gate / Test execution') {
             steps {
                 dir('backend') {
-                    bat 'mvn test'
+                    bat 'mvn clean test'
                 }
             }
             post {
@@ -21,13 +21,27 @@ pipeline {
             }
         }
 
-        stage('Verify Running Stack') {
+        stage('Docker Build & Verification') {
             steps {
                 powershell '''
-                    $res1 = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing
-                    $res2 = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing
-                    if ($res1.StatusCode -eq 200 -and $res2.StatusCode -eq 200) {
-                        Write-Host "Services are up and healthy!"
+                    Write-Host "Building and tagging local Docker images..."
+                    docker compose -f docker-compose.yml up -d --build
+
+                    docker images --filter "reference=rec-backend*" --filter "reference=rec-frontend*" --filter "reference=postgres*"
+                '''
+            }
+        }
+
+        stage('Health Check verification') {
+            steps {
+                powershell '''
+                    $backend = Invoke-WebRequest -Uri "http://localhost:8080/api/auth/roles" -UseBasicParsing
+                    $frontend = Invoke-WebRequest -Uri "http://localhost:5173" -UseBasicParsing
+
+                    if ($backend.StatusCode -eq 200 -and $frontend.StatusCode -eq 200) {
+                        Write-Host "Health checks passed."
+                    } else {
+                        throw "Health check failed: backend=${backend.StatusCode}, frontend=${frontend.StatusCode}"
                     }
                 '''
             }

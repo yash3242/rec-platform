@@ -11,6 +11,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import com.platform.recs.enumtype.RoleName;
+import java.util.Arrays;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -19,6 +23,11 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
+    }
+
+    @GetMapping({"/roles", "/api/auth/roles"})
+    public List<String> roles() {
+        return Arrays.stream(RoleName.values()).map(Enum::name).toList();
     }
 
     @PostMapping("/register")
