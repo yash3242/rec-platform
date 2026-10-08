@@ -1,0 +1,118 @@
+---
+- name: Configure REC Platform host baseline
+  hosts: rec_servers
+  become: yes
+  vars:
+    platform_user: recadmin
+    platform_group: recadmin
+    platform_root: /opt/rec-platform
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install base packages
+      apt:
+        name:
+          - curl
+          - git
+          - ufw
+          - iptables
+          - ca-certificates
+          - software-properties-common
+          - openjdk-17-jdk
+          - postgresql-client-16
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: yes
+
+    - name: Create recadmin group
+      group:
+        name: "{{ platform_group }}"
+        system: no
+
+    - name: Create recadmin user
+      user:
+        name: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        groups: docker,sudo
+        append: yes
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Ensure recadmin has passwordless sudo through sudoers.d
+      copy:
+        dest: /etc/sudoers.d/recadmin
+        content: "recadmin ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Create platform directory tree
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        mode: "0755"
+      loop:
+        - "{{ platform_root }}"
+        - "{{ platform_root }}/backend"
+        - "{{ platform_root }}/frontend"
+        - "{{ platform_root }}/logs"
+        - "{{ platform_root }}/config"
+
+    - name: Enforce directory permissions
+      file:
+        path: "{{ item }}"
+        owner: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        mode: "0755"
+        recurse: no
+      loop:
+        - "{{ platform_root }}"
+        - "{{ platform_root }}/backend"
+        - "{{ platform_root }}/frontend"
+        - "{{ platform_root }}/logs"
+        - "{{ platform_root }}/config"
+
+    - name: Configure UFW rules
+      ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop:
+        - "22"
+        - "80"
+        - "5173"
+        - "5432"
+        - "5433"
+        - "8080"
+        - "8081"
+
+    - name: Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Enable and start Docker daemon
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Verify Docker daemon is active
+      command: systemctl is-active docker
+      changed_when: false
+      register: docker_active
+
+    - name: Assert Docker is running
+      assert:
+        that:
+          - docker_active.stdout == "active"
+        fail_msg: "docker service is not active"
