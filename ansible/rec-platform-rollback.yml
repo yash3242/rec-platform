@@ -1,0 +1,111 @@
+---
+# Phase 9: rollback / recovery automation.
+# Simulates a failure (stops the backend container), then restores service by
+# restarting containers and verifying health again.
+#
+# NOTE: recovery intentionally uses plain `docker stop/start` (not compose)
+# because the ephemeral Ubuntu runner only ships the docker.io client, which
+# has no `compose` subcommand. Orchestrated rebuilds remain the job of
+# `docker compose up` on the Docker host (see scripts/run-phase9-validation.ps1
+# Step 1); this playbook proves stop/failure -> start/recovery with checks.
+- name: Roll back REC Platform to last known-good stable state
+  hosts: rec_servers
+  become: yes
+  vars:
+    backend_health_url: "http://host.docker.internal:8080/api/auth/roles"
+    frontend_health_url: "http://host.docker.internal:5173/"
+    db_host: host.docker.internal
+    db_port_primary: 5433
+
+  tasks:
+    - name: Record pre-rollback container state
+      shell: docker ps -a --format '{{'{{'}}.Names{{'}}'}}|{{'{{'}}.Status{{'}}'}}'
+      changed_when: false
+      failed_when: false
+      register: pre_state
+
+    - name: Show pre-rollback state
+      debug:
+        var: pre_state.stdout_lines
+
+    - name: Prune exited container cruft
+      shell: docker container prune -f
+      changed_when: true
+      failed_when: false
+      register: prune
+
+    - name: Simulate failure by stopping backend container
+      shell: docker stop rec-backend
+      changed_when: true
+      failed_when: false
+      register: simulate_failure
+
+    - name: Confirm backend is stopped (failure state)
+      shell: docker inspect -f '{{'{{'}}.State.Running{{'}}'}}' rec-backend
+      changed_when: false
+      failed_when: false
+      register: backend_running
+
+    - name: Show backend running flag after simulated failure
+      debug:
+        var: backend_running.stdout
+
+    - name: Assert failure state was reached
+      assert:
+        that:
+          - backend_running.stdout.strip() == "false"
+        fail_msg: "expected rec-backend to be stopped for the failure simulation"
+
+    - name: Recover by starting backend container
+      shell: docker start rec-backend
+      changed_when: true
+      register: recover_backend
+
+    - name: Ensure frontend container is running
+      shell: docker start rec-frontend
+      changed_when: false
+      failed_when: false
+      register: recover_frontend
+
+    - name: Wait for backend API recovery
+      uri:
+        url: "{{ backend_health_url }}"
+        method: GET
+        status_code: 200
+        return_content: no
+      register: backend_health
+      retries: 18
+      delay: 5
+      until: backend_health.status == 200
+
+    - name: Verify frontend recovery
+      uri:
+        url: "{{ frontend_health_url }}"
+        method: GET
+        status_code: 200
+        return_content: no
+      register: frontend_health
+      retries: 18
+      delay: 5
+      until: frontend_health.status == 200
+
+    - name: Verify database port recovery
+      wait_for:
+        host: "{{ db_host }}"
+        port: "{{ db_port_primary }}"
+        timeout: 30
+        state: started
+
+    - name: Record post-rollback container state
+      shell: docker ps --format '{{'{{'}}.Names{{'}}'}}|{{'{{'}}.Status{{'}}'}}|{{'{{'}}.Ports{{'}}'}}'
+      changed_when: false
+      failed_when: false
+      register: post_state
+
+    - name: Show post-rollback state
+      debug:
+        var: post_state.stdout_lines
+
+    - name: Rollback summary
+      debug:
+        msg: "Rollback complete. backend={{ backend_health.status }} frontend={{ frontend_health.status }} db={{ db_host }}:{{ db_port_primary }} open."

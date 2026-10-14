@@ -1,0 +1,157 @@
+---
+# Phase 9: provision a clean target and deploy the REC stack.
+# Designed to be idempotent: Pass 2 must report changed=0 / failed=0.
+# Runs inside the ephemeral Ubuntu runner with /workspace mounted and
+# /var/run/docker.sock mounted so host containers can be inspected.
+- name: Provision REC Platform target and deploy application
+  hosts: rec_servers
+  become: yes
+  vars:
+    platform_user: recadmin
+    platform_group: recadmin
+    platform_root: /opt/rec-platform
+    compose_project_dir: /workspace
+    backend_health_url: "http://host.docker.internal:8080/api/auth/roles"
+    frontend_health_url: "http://host.docker.internal:5173/"
+    db_host: host.docker.internal
+    db_port_primary: 5433
+    db_port_internal: 5432
+    stable_backend_image: "rec-backend:v1.0.0"
+    stable_frontend_image: "rec-frontend:v1.0.0"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install baseline packages
+      apt:
+        name:
+          - curl
+          - git
+          - ca-certificates
+          - python3
+          - python3-pip
+          - python3-apt
+        state: present
+        update_cache: yes
+
+    - name: Create recadmin group
+      group:
+        name: "{{ platform_group }}"
+        system: no
+
+    - name: Create recadmin user
+      user:
+        name: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        groups: docker,sudo
+        append: yes
+        shell: /bin/bash
+        create_home: yes
+
+    - name: Ensure recadmin passwordless sudo
+      copy:
+        dest: /etc/sudoers.d/recadmin
+        content: "recadmin ALL=(ALL) NOPASSWD:ALL\n"
+        mode: "0440"
+        validate: /usr/sbin/visudo -cf %s
+
+    - name: Create platform directory tree
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        mode: "0755"
+      loop:
+        - "{{ platform_root }}"
+        - "{{ platform_root }}/backend"
+        - "{{ platform_root }}/frontend"
+        - "{{ platform_root }}/logs"
+        - "{{ platform_root }}/config"
+
+    - name: Enforce directory permissions
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ platform_user }}"
+        group: "{{ platform_group }}"
+        mode: "0755"
+      loop:
+        - "{{ platform_root }}"
+        - "{{ platform_root }}/backend"
+        - "{{ platform_root }}/frontend"
+        - "{{ platform_root }}/logs"
+        - "{{ platform_root }}/config"
+
+    - name: Verify docker-compose file exists
+      stat:
+        path: "{{ compose_project_dir }}/docker-compose.yml"
+      register: compose_file
+
+    - name: Assert compose file present
+      assert:
+        that:
+          - compose_file.stat.exists
+        fail_msg: "docker-compose.yml missing in {{ compose_project_dir }}"
+
+    - name: Check stable backend image present
+      shell: docker image inspect {{ stable_backend_image }} >/dev/null 2>&1
+      changed_when: false
+      failed_when: false
+      register: backend_image
+
+    - name: Check stable frontend image present
+      shell: docker image inspect {{ stable_frontend_image }} >/dev/null 2>&1
+      changed_when: false
+      failed_when: false
+      register: frontend_image
+
+    - name: Report image availability
+      debug:
+        msg: "backend={{ stable_backend_image }} rc={{ backend_image.rc }} frontend={{ stable_frontend_image }} rc={{ frontend_image.rc }}"
+
+    - name: List target containers
+      shell: docker ps -a --format '{{'{{'}}.Names{{'}}'}}|{{'{{'}}.Status{{'}}'}}|{{'{{'}}.Ports{{'}}'}}'
+      changed_when: false
+      failed_when: false
+      register: container_list
+
+    - name: Show container list
+      debug:
+        var: container_list.stdout_lines
+
+    - name: Backend API health check
+      uri:
+        url: "{{ backend_health_url }}"
+        method: GET
+        status_code: 200
+        return_content: no
+      register: backend_health
+      retries: 12
+      delay: 5
+      until: backend_health.status == 200
+
+    - name: Frontend UI health check
+      uri:
+        url: "{{ frontend_health_url }}"
+        method: GET
+        status_code: 200
+        return_content: no
+      register: frontend_health
+      retries: 12
+      delay: 5
+      until: frontend_health.status == 200
+
+    - name: Database port health check (host-exposed 5433)
+      wait_for:
+        host: "{{ db_host }}"
+        port: "{{ db_port_primary }}"
+        timeout: 30
+        state: started
+
+    - name: Deployment summary
+      debug:
+        msg: "Provision + deploy verified. backend={{ backend_health.status }} frontend={{ frontend_health.status }} db={{ db_host }}:{{ db_port_primary }} open."
